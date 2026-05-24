@@ -67,6 +67,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="primas"
+        options={{
+          title: 'Primas',
+          tabBarIcon: ({ focused }) => (
+            <TabIcon name={focused ? 'gift' : 'gift-outline'} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: 'Ajustes',

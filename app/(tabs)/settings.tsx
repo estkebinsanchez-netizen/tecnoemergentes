@@ -166,9 +166,15 @@ export default function SettingsScreen() {
         </View>
 
         {/* Hora base */}
-        <Text style={s.seccion}>💰 Valor hora</Text>
+        <Text style={s.seccion}>💰 Valores de referencia</Text>
         <View style={s.seccionBox}>
           {campo('Valor hora ordinaria (COP)', 'valorHoraOrdinaria', false, 'Base de todos los cálculos. Cambia en abril cada año.')}
+          {campo(
+            'Salario básico diario (COP) — para primas',
+            'salarioBasicoDiario',
+            false,
+            'Usado para calcular primas extralegales. Por defecto: valor hora × 12 h = 278.362',
+          )}
         </View>
 
         {/* Factores de recargo ⚠ */}

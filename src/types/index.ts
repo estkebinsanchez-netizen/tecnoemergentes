@@ -35,6 +35,10 @@ export interface ConfiguracionUsuario {
   // Valor hora base
   valorHoraOrdinaria: number;  // default 23196.87
 
+  // Salario básico diario para primas (configurable)
+  // Por defecto: valorHoraOrdinaria × 12 h (una jornada = un día)
+  salarioBasicoDiario: number; // default 278362.44
+
   // Factores por hora de cada concepto (⚠ configurables)
   factorRecNocturno: number;       // default 8856.58  (por hora, × 12h/jornada)
   factorExtraDiurna25: number;     // default 8434.41
@@ -60,6 +64,7 @@ export interface ConfiguracionUsuario {
 export const CONFIG_DEFAULT: ConfiguracionUsuario = {
   nombre: '',
   valorHoraOrdinaria: 23196.87,
+  salarioBasicoDiario: 278362.44,  // 23196.87 × 12 h
   factorRecNocturno: 8856.58,
   factorExtraDiurna25: 8434.41,
   factorExtraNocturna40: 12231.72,
@@ -133,6 +138,40 @@ export interface AjusteManual {
   horasFestivos: number;
   tipoFestivo: 'DIURNO' | 'NOCTURNO';
   notas: string;
+}
+
+// ──────────────────────────────────────────────────────────
+// Primas extralegales
+// ──────────────────────────────────────────────────────────
+
+export type TipoPrima = 'JUNIO' | 'NAVIDAD' | 'VACACIONES';
+
+export interface LiquidacionPrima {
+  tipo: TipoPrima;
+  etiqueta: string;        // "Prima extralegal junio 2026"
+  fechaPago: string;       // YYYY-MM-DD
+  diasSalario: number;     // 25, 30 o 29
+  salarioBasicoDiario: number;
+  total: number;
+  proporcional: boolean;   // true si no completó el semestre
+  diasTrabajados?: number; // para cálculo proporcional
+  diasSemestre?: number;
+}
+
+// ──────────────────────────────────────────────────────────
+// Vacaciones
+// ──────────────────────────────────────────────────────────
+
+export interface PeriodoVacaciones {
+  id: string;
+  fechaInicio: string;     // YYYY-MM-DD — inicio del disfrute
+  fechaFin: string;        // YYYY-MM-DD — fin del disfrute
+  diasDisfrute: number;    // días calendario de disfrute
+  salarioBasicoDiario: number;
+  pagoVacaciones: number;  // días disfrute × salario básico diario
+  primaVacaciones: number; // 29 días × salario básico diario
+  totalRecibir: number;    // pagoVacaciones + primaVacaciones
+  observaciones: string;
 }
 
 // ──────────────────────────────────────────────────────────

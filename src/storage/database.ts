@@ -4,7 +4,7 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import type { ConfiguracionUsuario, QuincenaReal, AjusteManual } from '../types';
+import type { ConfiguracionUsuario, QuincenaReal, AjusteManual, PeriodoVacaciones } from '../types';
 import { CONFIG_DEFAULT } from '../types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
@@ -24,6 +24,7 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       id INTEGER PRIMARY KEY DEFAULT 1,
       nombre TEXT DEFAULT '',
       valorHoraOrdinaria REAL DEFAULT 23196.87,
+      salarioBasicoDiario REAL DEFAULT 278362.44,
       factorRecNocturno REAL DEFAULT 8856.58,
       factorExtraDiurna25 REAL DEFAULT 8434.41,
       factorExtraNocturna40 REAL DEFAULT 12231.72,
@@ -37,6 +38,18 @@ async function initSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       valorBaseFijo REAL DEFAULT 5567249,
       fechaAnclaje TEXT DEFAULT '2026-05-22',
       tipoAnclaje TEXT DEFAULT 'NOCTURNO'
+    );
+
+    CREATE TABLE IF NOT EXISTS periodo_vacaciones (
+      id TEXT PRIMARY KEY,
+      fechaInicio TEXT NOT NULL,
+      fechaFin TEXT NOT NULL,
+      diasDisfrute INTEGER NOT NULL,
+      salarioBasicoDiario REAL NOT NULL,
+      pagoVacaciones REAL NOT NULL,
+      primaVacaciones REAL NOT NULL,
+      totalRecibir REAL NOT NULL,
+      observaciones TEXT DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS quincena_real (
@@ -86,8 +99,8 @@ export async function saveConfig(config: ConfiguracionUsuario): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     `UPDATE configuracion SET
-      nombre = ?, valorHoraOrdinaria = ?, factorRecNocturno = ?,
-      factorExtraDiurna25 = ?, factorExtraNocturna40 = ?,
+      nombre = ?, valorHoraOrdinaria = ?, salarioBasicoDiario = ?,
+      factorRecNocturno = ?, factorExtraDiurna25 = ?, factorExtraNocturna40 = ?,
       factorDominicalFestivo = ?, pctSalud = ?, pctPension = ?,
       pctRetencion = ?, pctFondoSol = ?, pctSindical = ?,
       baseDeduccion = ?, valorBaseFijo = ?, fechaAnclaje = ?, tipoAnclaje = ?
@@ -95,6 +108,7 @@ export async function saveConfig(config: ConfiguracionUsuario): Promise<void> {
     [
       config.nombre,
       config.valorHoraOrdinaria,
+      config.salarioBasicoDiario,
       config.factorRecNocturno,
       config.factorExtraDiurna25,
       config.factorExtraNocturna40,
@@ -159,4 +173,30 @@ export async function saveAjuste(a: AjusteManual): Promise<void> {
 export async function deleteAjuste(id: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM ajuste_manual WHERE id = ?', [id]);
+}
+
+// ── Vacaciones ────────────────────────────────────────────
+
+export async function loadVacaciones(): Promise<PeriodoVacaciones[]> {
+  const db = await getDatabase();
+  return await db.getAllAsync<PeriodoVacaciones>(
+    'SELECT * FROM periodo_vacaciones ORDER BY fechaInicio ASC',
+  );
+}
+
+export async function saveVacaciones(v: PeriodoVacaciones): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    `INSERT OR REPLACE INTO periodo_vacaciones
+      (id, fechaInicio, fechaFin, diasDisfrute, salarioBasicoDiario,
+       pagoVacaciones, primaVacaciones, totalRecibir, observaciones)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [v.id, v.fechaInicio, v.fechaFin, v.diasDisfrute, v.salarioBasicoDiario,
+     v.pagoVacaciones, v.primaVacaciones, v.totalRecibir, v.observaciones],
+  );
+}
+
+export async function deleteVacaciones(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM periodo_vacaciones WHERE id = ?', [id]);
 }
