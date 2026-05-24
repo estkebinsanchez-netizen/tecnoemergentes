@@ -10,7 +10,7 @@ import {
   useColorScheme,
   Alert,
 } from 'react-native';
-import { File, Paths } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system/next';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { useConfig } from '../../src/hooks/useConfig';
