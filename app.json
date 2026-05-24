@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Turnos & Quincenas",
+    "slug": "tecnoemergentes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "turnos",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tecnoemergentes.turnos"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1565C0",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "package": "com.tecnoemergentes.turnos"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1565C0"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
