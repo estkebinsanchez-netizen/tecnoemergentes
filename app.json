@@ -24,14 +24,7 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#1565C0"
-        }
-      ]
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true
