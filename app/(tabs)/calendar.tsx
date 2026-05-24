@@ -9,201 +9,173 @@ import {
   useColorScheme,
 } from 'react-native';
 import dayjs from 'dayjs';
+import 'dayjs/locale/es';
 import { useConfig } from '../../src/hooks/useConfig';
 import { clasificarDia } from '../../src/engine/shifts';
+import { useTheme, Colors, Typography, Spacing, Radius } from '../../src/theme';
 import type { TipoTurno } from '../../src/types';
 
-const DIAS_SEMANA = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
-const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
+dayjs.locale('es');
 
-function colorTurno(tipo: TipoTurno, dark: boolean) {
+const DIAS_HEADER = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+
+function turnoColor(tipo: TipoTurno, dark: boolean) {
   switch (tipo) {
-    case 'DIURNO': return { bg: '#FFF9C4', text: '#F57F17', border: '#F9A825' };
-    case 'NOCTURNO': return { bg: '#E3F2FD', text: '#1565C0', border: '#1976D2' };
-    case 'DESCANSO': return { bg: dark ? '#1e3a28' : '#E8F5E9', text: '#2E7D32', border: '#388E3C' };
+    case 'NOCTURNO': return { bg: dark ? Colors.nocturno.dark : Colors.nocturno.light, text: Colors.nocturno.text };
+    case 'DIURNO': return { bg: dark ? Colors.diurno.dark : Colors.diurno.light, text: Colors.diurno.text };
+    case 'DESCANSO': return { bg: dark ? Colors.descanso.dark : Colors.descanso.light, text: Colors.descanso.text };
   }
 }
 
-function leyendaLabel(tipo: TipoTurno) {
-  switch (tipo) {
-    case 'DIURNO': return '☀️ Diurno';
-    case 'NOCTURNO': return '🌙 Nocturno';
-    case 'DESCANSO': return '🏖 Descanso';
-  }
-}
+const TURNO_LABEL: Record<TipoTurno, string> = {
+  NOCTURNO: 'Nocturno',
+  DIURNO: 'Diurno',
+  DESCANSO: 'Descanso',
+};
 
 export default function CalendarScreen() {
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
-  const s = styles(dark);
+  const t = useTheme(dark);
   const { config } = useConfig();
 
   const hoy = dayjs();
-  const [mesActual, setMesActual] = useState(hoy);
+  const [mes, setMes] = useState(hoy);
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
 
   const diasDelMes = useMemo(() => {
-    const inicio = mesActual.startOf('month');
-    const fin = mesActual.endOf('month');
-    const dias = [];
+    const inicio = mes.startOf('month');
+    const fin = mes.endOf('month');
+    const result: ({ fecha: string } & ReturnType<typeof clasificarDia> | null)[] = [];
 
-    // Días vacíos al inicio (domingo = 0)
-    const primerDia = inicio.day();
-    for (let i = 0; i < primerDia; i++) {
-      dias.push(null);
+    for (let i = 0; i < inicio.day(); i++) result.push(null);
+
+    let c = inicio;
+    while (!c.isAfter(fin)) {
+      const fecha = c.format('YYYY-MM-DD');
+      result.push({ ...clasificarDia(fecha, config), fecha });
+      c = c.add(1, 'day');
     }
+    return result;
+  }, [mes, config]);
 
-    let cursor = inicio;
-    while (!cursor.isAfter(fin)) {
-      const fecha = cursor.format('YYYY-MM-DD');
-      const clasificado = clasificarDia(fecha, config);
-      dias.push({ ...clasificado, fecha });
-      cursor = cursor.add(1, 'day');
-    }
-    return dias;
-  }, [mesActual, config]);
-
-  const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
-  const infoSeleccionado = diaSeleccionado
-    ? clasificarDia(diaSeleccionado, config)
-    : null;
+  const infoSel = seleccionado ? clasificarDia(seleccionado, config) : null;
 
   return (
-    <SafeAreaView style={s.container}>
-      <View style={s.header}>
-        <Text style={s.headerTitle}>Calendario de Turnos</Text>
+    <SafeAreaView style={[s.container, { backgroundColor: t.bg }]}>
+      {/* Barra superior */}
+      <View style={[s.topBar, { borderBottomColor: t.separator }]}>
+        <Text style={[s.topTitle, { color: t.text }]}>Turnos</Text>
       </View>
 
       <ScrollView>
         {/* Navegación de mes */}
-        <View style={s.navMes}>
-          <TouchableOpacity
-            style={s.navBtn}
-            onPress={() => setMesActual((m) => m.subtract(1, 'month'))}
-          >
-            <Text style={s.navBtnText}>◀</Text>
+        <View style={[s.navMes, { borderBottomColor: t.separator }]}>
+          <TouchableOpacity style={s.navBtn} onPress={() => setMes((m) => m.subtract(1, 'month'))}>
+            <Text style={[s.navArrow, { color: Colors.accent }]}>‹</Text>
           </TouchableOpacity>
-          <Text style={s.mesLabel}>
-            {MESES[mesActual.month()]} {mesActual.year()}
+          <Text style={[s.mesLabel, { color: t.text }]}>
+            {mes.format('MMMM YYYY')}
           </Text>
-          <TouchableOpacity
-            style={s.navBtn}
-            onPress={() => setMesActual((m) => m.add(1, 'month'))}
-          >
-            <Text style={s.navBtnText}>▶</Text>
+          <TouchableOpacity style={s.navBtn} onPress={() => setMes((m) => m.add(1, 'month'))}>
+            <Text style={[s.navArrow, { color: Colors.accent }]}>›</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Encabezados días de semana */}
-        <View style={s.semanaHeader}>
-          {DIAS_SEMANA.map((d) => (
-            <View key={d} style={s.diaSemanaBox}>
-              <Text style={[s.diaSemanaText, d === 'Do' && { color: '#e53935' }]}>
-                {d}
-              </Text>
-            </View>
+        {/* Cabecera días semana */}
+        <View style={[s.semanaRow, { backgroundColor: t.card, borderBottomColor: t.separator }]}>
+          {DIAS_HEADER.map((d) => (
+            <Text
+              key={d}
+              style={[s.semanaLabel, { color: d === 'Do' ? Colors.negative : t.textTertiary }]}
+            >
+              {d}
+            </Text>
           ))}
         </View>
 
-        {/* Grid del mes */}
-        <View style={s.grid}>
+        {/* Grid */}
+        <View style={[s.grid, { backgroundColor: t.bg }]}>
           {diasDelMes.map((dia, idx) => {
-            if (!dia) {
-              return <View key={`empty-${idx}`} style={s.diaVacio} />;
-            }
+            if (!dia) return <View key={`e${idx}`} style={s.celdaVacia} />;
+
             const esHoy = dia.fecha === hoy.format('YYYY-MM-DD');
-            const esSeleccionado = dia.fecha === diaSeleccionado;
-            const colores = colorTurno(dia.tipo, dark);
-            const esDomingo = dayjs(dia.fecha).day() === 0;
+            const esSel = dia.fecha === seleccionado;
+            const col = turnoColor(dia.tipo, dark);
+            const esDom = dayjs(dia.fecha).day() === 0;
 
             return (
               <TouchableOpacity
                 key={dia.fecha}
                 style={[
-                  s.diaBox,
-                  { backgroundColor: colores.bg, borderColor: colores.border },
-                  esHoy && s.diaHoy,
-                  esSeleccionado && s.diaSeleccionado,
+                  s.celda,
+                  { backgroundColor: col.bg },
+                  esHoy && s.celdaHoy,
+                  esSel && { borderWidth: 2, borderColor: Colors.accent },
                 ]}
-                onPress={() =>
-                  setDiaSeleccionado(
-                    esSeleccionado ? null : dia.fecha,
-                  )
-                }
+                onPress={() => setSeleccionado(esSel ? null : dia.fecha)}
+                activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    s.diaNum,
-                    { color: esDomingo ? '#e53935' : colores.text },
-                    esHoy && s.diaNumHoy,
-                  ]}
-                >
+                <Text style={[
+                  s.celdaNum,
+                  { color: esDom ? Colors.negative : col.text },
+                  esHoy && s.celdaNumHoy,
+                ]}>
                   {dayjs(dia.fecha).date()}
                 </Text>
-                {(dia.esFestivo) && (
-                  <Text style={s.diaFestMarca}>◆</Text>
+                {dia.esFestivo && (
+                  <View style={[s.festPunto, { backgroundColor: Colors.warning }]} />
                 )}
-                <Text style={[s.diaTipo, { color: colores.text }]}>
-                  {dia.tipo === 'DIURNO' ? '☀' : dia.tipo === 'NOCTURNO' ? '🌙' : '🏖'}
-                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Detalle del día seleccionado */}
-        {infoSeleccionado && diaSeleccionado && (
-          <View style={s.detalleDia}>
-            <Text style={s.detalleTitle}>
-              {dayjs(diaSeleccionado).format('dddd D [de] MMMM YYYY')}
+        {/* Detalle día seleccionado */}
+        {seleccionado && infoSel && (
+          <View style={[s.detalle, { backgroundColor: t.card, borderTopColor: t.separator }]}>
+            <Text style={[s.detalleFecha, { color: t.text }]}>
+              {dayjs(seleccionado).format('dddd, D [de] MMMM')}
             </Text>
-            <View
-              style={[
-                s.detalleBadge,
-                { backgroundColor: colorTurno(infoSeleccionado.tipo, dark).bg },
-              ]}
-            >
-              <Text
-                style={[
-                  s.detalleBadgeText,
-                  { color: colorTurno(infoSeleccionado.tipo, dark).text },
-                ]}
-              >
-                {leyendaLabel(infoSeleccionado.tipo)}
-                {infoSeleccionado.numeroDia
-                  ? ` — día ${infoSeleccionado.numeroDia}`
-                  : ''}
-              </Text>
+            <View style={s.detalleRow}>
+              <View style={[s.detalleBadge, { backgroundColor: turnoColor(infoSel.tipo, dark).bg }]}>
+                <Text style={[s.detalleBadgeText, { color: turnoColor(infoSel.tipo, dark).text }]}>
+                  {TURNO_LABEL[infoSel.tipo]}
+                  {infoSel.numeroDia ? ` · día ${infoSel.numeroDia}` : ''}
+                </Text>
+              </View>
+              {infoSel.esDomingo && (
+                <View style={[s.detalleBadge, { backgroundColor: dark ? '#2A0D0D' : '#FFF5F5' }]}>
+                  <Text style={[s.detalleBadgeText, { color: Colors.negative }]}>Domingo</Text>
+                </View>
+              )}
+              {infoSel.esFestivo && (
+                <View style={[s.detalleBadge, { backgroundColor: dark ? '#2A1E00' : '#FFF8EE' }]}>
+                  <Text style={[s.detalleBadgeText, { color: Colors.warning }]}>
+                    {infoSel.nombreFestivo}
+                  </Text>
+                </View>
+              )}
             </View>
-            {infoSeleccionado.esDomingo && (
-              <Text style={s.detalleSub}>📅 Domingo</Text>
-            )}
-            {infoSeleccionado.esFestivo && (
-              <Text style={s.detalleSub}>
-                ◆ Festivo: {infoSeleccionado.nombreFestivo}
-              </Text>
-            )}
           </View>
         )}
 
         {/* Leyenda */}
-        <View style={s.leyenda}>
+        <View style={[s.leyenda, { borderTopColor: t.separator }]}>
           {(['NOCTURNO', 'DIURNO', 'DESCANSO'] as TipoTurno[]).map((tipo) => {
-            const col = colorTurno(tipo, dark);
+            const col = turnoColor(tipo, dark);
             return (
               <View key={tipo} style={s.leyendaItem}>
-                <View style={[s.leyendaColor, { backgroundColor: col.bg, borderColor: col.border }]} />
-                <Text style={[s.leyendaText, { color: col.text }]}>
-                  {leyendaLabel(tipo)}
+                <View style={[s.leyendaSquare, { backgroundColor: col.bg }]} />
+                <Text style={[s.leyendaText, { color: t.textSecondary }]}>
+                  {TURNO_LABEL[tipo]}
                 </Text>
               </View>
             );
           })}
           <View style={s.leyendaItem}>
-            <Text style={s.leyendaFestMarca}>◆</Text>
-            <Text style={s.leyendaText}>Festivo</Text>
+            <View style={[s.festPunto, { backgroundColor: Colors.warning }]} />
+            <Text style={[s.leyendaText, { color: t.textSecondary }]}>Festivo</Text>
           </View>
         </View>
       </ScrollView>
@@ -211,80 +183,66 @@ export default function CalendarScreen() {
   );
 }
 
-const styles = (dark: boolean) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: dark ? '#0f0f23' : '#f0f4f8' },
-    header: {
-      backgroundColor: dark ? '#1a1a2e' : '#1565C0',
-      padding: 16,
-      paddingTop: 20,
-    },
-    headerTitle: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-    navMes: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: 16,
-      backgroundColor: dark ? '#1a1a2e' : '#1976D2',
-    },
-    navBtn: { padding: 8 },
-    navBtnText: { color: '#fff', fontSize: 18 },
-    mesLabel: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-    semanaHeader: {
-      flexDirection: 'row',
-      paddingHorizontal: 4,
-      paddingVertical: 8,
-      backgroundColor: dark ? '#1e1e3a' : '#fff',
-    },
-    diaSemanaBox: { flex: 1, alignItems: 'center' },
-    diaSemanaText: { fontSize: 12, color: dark ? '#aaa' : '#666', fontWeight: '600' },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      padding: 4,
-      backgroundColor: dark ? '#0f0f23' : '#f0f4f8',
-    },
-    diaVacio: { width: '14.28%', aspectRatio: 1, padding: 2 },
-    diaBox: {
-      width: '14.28%',
-      aspectRatio: 0.9,
-      padding: 2,
-      margin: 1,
-      borderRadius: 8,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    diaHoy: { borderWidth: 3, borderColor: '#FF6F00' },
-    diaSeleccionado: { borderWidth: 3, borderColor: '#7B1FA2' },
-    diaNum: { fontSize: 13, fontWeight: 'bold' },
-    diaNumHoy: { textDecorationLine: 'underline' },
-    diaFestMarca: { fontSize: 8, color: '#FF8F00' },
-    diaTipo: { fontSize: 10 },
-    detalleDia: {
-      margin: 16,
-      padding: 16,
-      backgroundColor: dark ? '#1e1e3a' : '#fff',
-      borderRadius: 12,
-    },
-    detalleTitle: {
-      fontSize: 15,
-      fontWeight: 'bold',
-      color: dark ? '#e0e0e0' : '#333',
-      marginBottom: 8,
-      textTransform: 'capitalize',
-    },
-    detalleBadge: { padding: 8, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 4 },
-    detalleBadgeText: { fontWeight: 'bold', fontSize: 14 },
-    detalleSub: { color: dark ? '#aaa' : '#666', fontSize: 13, marginTop: 4 },
-    leyenda: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      padding: 16,
-      gap: 12,
-    },
-    leyendaItem: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
-    leyendaColor: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, marginRight: 4 },
-    leyendaFestMarca: { color: '#FF8F00', marginRight: 4 },
-    leyendaText: { fontSize: 12, color: dark ? '#aaa' : '#555' },
-  });
+const s = StyleSheet.create({
+  container: { flex: 1 },
+  topBar: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  topTitle: { ...Typography.headline },
+  navMes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+  },
+  navBtn: { padding: 8 },
+  navArrow: { fontSize: 24, fontWeight: '300' },
+  mesLabel: { ...Typography.title3, textTransform: 'capitalize' },
+  semanaRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+  },
+  semanaLabel: { flex: 1, textAlign: 'center', ...Typography.caption2, fontWeight: '600' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', padding: 4 },
+  celdaVacia: { width: '14.28%', aspectRatio: 1.1, padding: 2 },
+  celda: {
+    width: '14.28%',
+    aspectRatio: 1.1,
+    margin: 1,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  celdaHoy: { borderWidth: 2, borderColor: Colors.accent },
+  celdaNum: { ...Typography.footnote, fontWeight: '600' },
+  celdaNumHoy: { fontWeight: '800' },
+  festPunto: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  detalle: {
+    padding: Spacing.md,
+    borderTopWidth: 0.5,
+  },
+  detalleFecha: {
+    ...Typography.headline,
+    textTransform: 'capitalize',
+    marginBottom: 10,
+  },
+  detalleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  detalleBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  detalleBadgeText: { ...Typography.footnote, fontWeight: '600' },
+  leyenda: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    padding: Spacing.md,
+    borderTopWidth: 0.5,
+  },
+  leyendaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  leyendaSquare: { width: 12, height: 12, borderRadius: 3 },
+  leyendaText: { ...Typography.caption },
+});

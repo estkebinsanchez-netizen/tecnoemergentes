@@ -100,6 +100,7 @@ export interface DetalleDeduccion {
 
 export interface LiquidacionQuincena {
   quincenaId: string;
+  tipo: TipoQuincena;
   fechaInicio: string;
   fechaFin: string;
   etiqueta: string;

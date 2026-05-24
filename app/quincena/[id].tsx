@@ -13,24 +13,25 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import dayjs from 'dayjs';
 
 import { useConfig } from '../../src/hooks/useConfig';
-import { useQuincenas } from '../../src/hooks/useQuincenas';
 import { loadAjustes, saveAjuste, deleteAjuste } from '../../src/storage/database';
 import { calcularQuincena } from '../../src/engine/payroll';
 import { generarQuincenas } from '../../src/engine/periods';
-import { formatCOP, formatHoras, formatRango } from '../../src/utils/formatting';
-import type { AjusteManual, LiquidacionQuincena, ConceptoPago } from '../../src/types';
+import { formatCOP, formatRango } from '../../src/utils/formatting';
+import { useTheme, Colors, Typography, Spacing, Radius } from '../../src/theme';
+import type { AjusteManual, ConceptoPago } from '../../src/types';
 
 export default function DetalleQuincenaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const scheme = useColorScheme();
   const dark = scheme === 'dark';
-  const s = styles(dark);
+  const t = useTheme(dark);
+  const router = useRouter();
   const { config } = useConfig();
 
   const [ajustes, setAjustes] = useState<AjusteManual[]>([]);
@@ -38,7 +39,6 @@ export default function DetalleQuincenaScreen() {
   const [horasExtraD, setHorasExtraD] = useState('0');
   const [horasExtraN, setHorasExtraN] = useState('0');
   const [descAjuste, setDescAjuste] = useState('');
-  const [notaAjuste, setNotaAjuste] = useState('');
 
   const quincenas = generarQuincenas(config);
   const quincena = quincenas.find((q) => q.id === id);
@@ -53,13 +53,13 @@ export default function DetalleQuincenaScreen() {
 
   if (!quincena) {
     return (
-      <SafeAreaView style={s.container}>
-        <Text style={s.error}>Quincena no encontrada.</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: t.bg }}>
+        <Text style={{ color: t.text, padding: 20 }}>Quincena no encontrada.</Text>
       </SafeAreaView>
     );
   }
 
-  const liquidacion = calcularQuincena(quincena, config, ajustes);
+  const liq = calcularQuincena(quincena, config, ajustes);
 
   async function guardarAjuste() {
     const eD = parseFloat(horasExtraD.replace(',', '.')) || 0;
@@ -68,7 +68,7 @@ export default function DetalleQuincenaScreen() {
       Alert.alert('Error', 'Ingresa al menos una hora extra.');
       return;
     }
-    const nuevo: AjusteManual = {
+    await saveAjuste({
       id: `aj_${id}_${Date.now()}`,
       quincenaId: id,
       descripcion: descAjuste || 'Ajuste manual',
@@ -76,259 +76,272 @@ export default function DetalleQuincenaScreen() {
       tipoExtra: 'DIURNA',
       horasFestivos: eN,
       tipoFestivo: 'NOCTURNO',
-      notas: notaAjuste,
-    };
-    await saveAjuste(nuevo);
+      notas: '',
+    });
     setModalAjuste(false);
     setHorasExtraD('0');
     setHorasExtraN('0');
     setDescAjuste('');
-    setNotaAjuste('');
-    cargarAjustes();
-  }
-
-  async function eliminarAjuste(ajId: string) {
-    await deleteAjuste(ajId);
     cargarAjustes();
   }
 
   async function exportarDetalle() {
-    const filaConceptos = liquidacion.conceptos
+    const filaConceptos = liq.conceptos
       .map(
-        (c) =>
-          `<tr>
-            <td>${c.nombre}</td>
-            <td style="text-align:right">${c.horas.toFixed(2)}</td>
-            <td style="text-align:right">${formatCOP(c.valorUnitario)}</td>
-            <td style="text-align:right; font-weight:bold">${formatCOP(c.total)}</td>
-          </tr>`,
-      )
-      .join('');
+        (c) => `<tr>
+          <td>${c.nombre}</td>
+          <td style="text-align:right">${c.horas.toFixed(2)} h</td>
+          <td style="text-align:right;font-weight:600">${formatCOP(c.total)}</td>
+        </tr>`,
+      ).join('');
 
-    const filaDeducciones = liquidacion.deducciones
+    const filaDeducciones = liq.deducciones
       .map(
-        (d) =>
-          `<tr>
-            <td>${d.nombre}</td>
-            <td colspan="2" style="text-align:right">${d.porcentaje.toFixed(2)}%</td>
-            <td style="text-align:right; color:red">−${formatCOP(d.valor)}</td>
-          </tr>`,
-      )
-      .join('');
+        (d) => `<tr>
+          <td>${d.nombre}</td>
+          <td style="text-align:right">${d.porcentaje.toFixed(2)}%</td>
+          <td style="text-align:right;color:#FF3B30">−${formatCOP(d.valor)}</td>
+        </tr>`,
+      ).join('');
 
-    const html = `
-      <html><head><meta charset="utf-8"/>
-        <style>
-          body { font-family: Arial; font-size: 12px; padding: 20px; }
-          h1 { color: #1565C0; } h2 { color: #333; font-size: 14px; margin-top: 20px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-          th { background: #1565C0; color: white; padding: 8px; }
-          td { padding: 6px 8px; border-bottom: 1px solid #ddd; }
-          .total { font-size: 14px; font-weight: bold; margin: 12px 0; }
-          .neto { font-size: 18px; color: #2E7D32; font-weight: bold; }
-        </style>
-      </head><body>
-        <h1>${liquidacion.etiqueta}</h1>
-        <p>${formatRango(liquidacion.fechaInicio, liquidacion.fechaFin)}</p>
-        <p>Días: ${liquidacion.diasNocturnos} nocturnos · ${liquidacion.diasDiurnos} diurnos · ${liquidacion.diasDescanso} descanso</p>
-        <h2>Devengados</h2>
-        <table>
-          <tr><th>Concepto</th><th>Horas</th><th>Valor/hora</th><th>Total</th></tr>
-          ${filaConceptos}
-          <tr><td colspan="3"><strong>TOTAL BRUTO</strong></td><td style="text-align:right;font-weight:bold">${formatCOP(liquidacion.totalBruto)}</td></tr>
-        </table>
-        <h2>Deducciones</h2>
-        <table>
-          <tr><th>Concepto</th><th colspan="2">%</th><th>Valor</th></tr>
-          ${filaDeducciones}
-          <tr><td colspan="3"><strong>TOTAL DESCUENTOS</strong></td><td style="text-align:right;color:red;font-weight:bold">−${formatCOP(liquidacion.totalDeducciones)}</td></tr>
-        </table>
-        <div class="total neto" style="margin-top:16px">NETO A PAGAR: ${formatCOP(liquidacion.neto)}</div>
-        <p style="color:#888; font-size:10px;">⚠ Proyección estimada. Verificar con liquidación real.</p>
-      </body></html>
-    `;
+    const html = `<html><head><meta charset="utf-8"/>
+      <style>
+        body{font-family:-apple-system,Arial;font-size:12px;padding:24px;color:#1C1C1E}
+        h1{font-size:18px;font-weight:700;margin-bottom:2px}
+        .sub{color:#6C6C70;font-size:12px;margin-bottom:20px}
+        h2{font-size:13px;font-weight:600;color:#6C6C70;text-transform:uppercase;letter-spacing:0.5px;margin:20px 0 8px}
+        table{width:100%;border-collapse:collapse}
+        td{padding:7px 4px;border-bottom:1px solid #F2F2F7;font-size:12px}
+        .neto{font-size:22px;font-weight:700;color:#34C759;margin-top:20px}
+        .note{font-size:10px;color:#AEAEB2;margin-top:16px}
+      </style></head><body>
+      <h1>${liq.etiqueta}</h1>
+      <div class="sub">${formatRango(liq.fechaInicio, liq.fechaFin)}</div>
+      <h2>Devengados</h2>
+      <table>${filaConceptos}
+        <tr><td colspan="2"><strong>Total bruto</strong></td>
+        <td style="text-align:right;font-weight:700;color:#007AFF">${formatCOP(liq.totalBruto)}</td></tr>
+      </table>
+      <h2>Deducciones</h2>
+      <table>${filaDeducciones}
+        <tr><td colspan="2"><strong>Total descuentos</strong></td>
+        <td style="text-align:right;font-weight:700;color:#FF3B30">−${formatCOP(liq.totalDeducciones)}</td></tr>
+      </table>
+      <div class="neto">Neto a pagar: ${formatCOP(liq.neto)}</div>
+      <div class="note">⚠ Proyección estimada. Verificar con liquidación real.</div>
+      </body></html>`;
 
     const { uri } = await Print.printToFileAsync({ html });
     await Sharing.shareAsync(uri, { mimeType: 'application/pdf' });
   }
 
-  function ConceptoRow({ c }: { c: ConceptoPago }) {
+  function Separador() {
+    return <View style={[s.sep, { backgroundColor: t.separator }]} />;
+  }
+
+  function FilaConcepto({ c }: { c: ConceptoPago }) {
     return (
-      <View style={s.conceptoRow}>
-        <Text style={s.conceptoNombre} numberOfLines={2}>{c.nombre}</Text>
-        <Text style={s.conceptoHoras}>{c.horas.toFixed(1)} h</Text>
-        <Text style={s.conceptoTotal}>{formatCOP(c.total)}</Text>
+      <View style={s.fila}>
+        <Text style={[s.filaNombre, { color: t.text }]} numberOfLines={2}>{c.nombre}</Text>
+        <Text style={[s.filaHoras, { color: t.textTertiary }]}>{c.horas.toFixed(1)} h</Text>
+        <Text style={[s.filaTotal, { color: t.text }]}>{formatCOP(c.total)}</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={s.container}>
-      <ScrollView contentContainerStyle={s.content}>
-        {/* Encabezado */}
-        <View style={s.encabezado}>
-          <Text style={s.titulo}>{liquidacion.etiqueta}</Text>
-          <Text style={s.rango}>{formatRango(liquidacion.fechaInicio, liquidacion.fechaFin)}</Text>
+    <SafeAreaView style={[s.container, { backgroundColor: t.bg }]}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
 
-          <View style={s.resumenDias}>
-            {liquidacion.diasNocturnos > 0 && (
-              <View style={s.badgeDia}>
-                <Text style={s.badgeDiaText}>🌙 {liquidacion.diasNocturnos}</Text>
+        {/* Encabezado */}
+        <View style={[s.encabezado, { backgroundColor: t.card }]}>
+          <Text style={[s.encTitulo, { color: t.textSecondary }]}>
+            {liq.tipo === 'B' ? '2ª quincena' : '1ª quincena'}
+          </Text>
+          <Text style={[s.encMes, { color: t.text }]}>{liq.etiqueta.split('quincena ')[1]}</Text>
+          <Text style={[s.encRango, { color: t.textTertiary }]}>
+            {formatRango(liq.fechaInicio, liq.fechaFin)}
+          </Text>
+
+          {/* Resumen días */}
+          <View style={[s.diasBox, { backgroundColor: t.secondary }]}>
+            {liq.diasNocturnos > 0 && (
+              <View style={s.diaItem}>
+                <Text style={[s.diaNum, { color: Colors.nocturno.text }]}>{liq.diasNocturnos}</Text>
+                <Text style={[s.diaLbl, { color: t.textTertiary }]}>Noct.</Text>
               </View>
             )}
-            {liquidacion.diasDiurnos > 0 && (
-              <View style={[s.badgeDia, { backgroundColor: '#FFF9C4' }]}>
-                <Text style={[s.badgeDiaText, { color: '#F57F17' }]}>☀️ {liquidacion.diasDiurnos}</Text>
+            {liq.diasDiurnos > 0 && (
+              <View style={s.diaItem}>
+                <Text style={[s.diaNum, { color: '#92400E' }]}>{liq.diasDiurnos}</Text>
+                <Text style={[s.diaLbl, { color: t.textTertiary }]}>Diurn.</Text>
               </View>
             )}
-            {liquidacion.diasDescanso > 0 && (
-              <View style={[s.badgeDia, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={[s.badgeDiaText, { color: '#2E7D32' }]}>🏖 {liquidacion.diasDescanso}</Text>
+            {liq.diasDescanso > 0 && (
+              <View style={s.diaItem}>
+                <Text style={[s.diaNum, { color: Colors.descanso.text }]}>{liq.diasDescanso}</Text>
+                <Text style={[s.diaLbl, { color: t.textTertiary }]}>Desc.</Text>
               </View>
             )}
-            {liquidacion.diasDomFestTrabajados > 0 && (
-              <View style={[s.badgeDia, { backgroundColor: '#FBE9E7' }]}>
-                <Text style={[s.badgeDiaText, { color: '#BF360C' }]}>📅 {liquidacion.diasDomFestTrabajados}</Text>
+            {liq.diasDomFestTrabajados > 0 && (
+              <View style={s.diaItem}>
+                <Text style={[s.diaNum, { color: Colors.warning }]}>{liq.diasDomFestTrabajados}</Text>
+                <Text style={[s.diaLbl, { color: t.textTertiary }]}>Dom/F.</Text>
               </View>
             )}
           </View>
         </View>
 
+        {/* Neto — hero */}
+        <View style={[s.netoCard, { backgroundColor: t.positiveBg }]}>
+          <Text style={[s.netoLabel, { color: t.textSecondary }]}>Neto a pagar</Text>
+          <Text style={s.netoValor}>{formatCOP(liq.neto)}</Text>
+        </View>
+
         {/* Devengados */}
-        <View style={s.seccion}>
-          <Text style={s.seccionTitulo}>📈 Conceptos devengados</Text>
-          <View style={s.tablaHeader}>
-            <Text style={[s.tablaHeaderTxt, { flex: 2 }]}>Concepto</Text>
-            <Text style={s.tablaHeaderTxt}>Horas</Text>
-            <Text style={s.tablaHeaderTxt}>Total</Text>
-          </View>
-          {liquidacion.conceptos.map((c, i) => (
-            <ConceptoRow key={i} c={c} />
+        <View style={[s.seccion, { backgroundColor: t.card }]}>
+          <Text style={[s.secTitulo, { color: t.textSecondary }]}>DEVENGADOS</Text>
+          <Separador />
+          {liq.conceptos.map((c, i) => (
+            <React.Fragment key={i}>
+              <FilaConcepto c={c} />
+              {i < liq.conceptos.length - 1 && <Separador />}
+            </React.Fragment>
           ))}
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>TOTAL BRUTO</Text>
-            <Text style={s.totalBruto}>{formatCOP(liquidacion.totalBruto)}</Text>
+          <Separador />
+          <View style={s.totalFila}>
+            <Text style={[s.totalLabel, { color: t.text }]}>Total bruto</Text>
+            <Text style={[s.totalVal, { color: Colors.accent }]}>
+              {formatCOP(liq.totalBruto)}
+            </Text>
           </View>
         </View>
 
         {/* Deducciones */}
-        <View style={s.seccion}>
-          <Text style={s.seccionTitulo}>📉 Deducciones</Text>
-          {liquidacion.deducciones.map((d, i) => (
-            <View key={i} style={s.deduccionRow}>
-              <Text style={s.deduccionNombre} numberOfLines={2}>{d.nombre}</Text>
-              <Text style={s.deduccionPct}>{d.porcentaje.toFixed(2)}%</Text>
-              <Text style={s.deduccionVal}>−{formatCOP(d.valor)}</Text>
-            </View>
+        <View style={[s.seccion, { backgroundColor: t.card }]}>
+          <Text style={[s.secTitulo, { color: t.textSecondary }]}>DEDUCCIONES</Text>
+          <Separador />
+          {liq.deducciones.map((d, i) => (
+            <React.Fragment key={i}>
+              <View style={s.fila}>
+                <Text style={[s.filaNombre, { color: t.text }]} numberOfLines={2}>{d.nombre}</Text>
+                <Text style={[s.filaHoras, { color: t.textTertiary }]}>{d.porcentaje.toFixed(2)}%</Text>
+                <Text style={[s.filaTotal, { color: Colors.negative }]}>−{formatCOP(d.valor)}</Text>
+              </View>
+              {i < liq.deducciones.length - 1 && <Separador />}
+            </React.Fragment>
           ))}
-          <View style={s.totalRow}>
-            <Text style={s.totalLabel}>TOTAL DESC.</Text>
-            <Text style={s.totalDesc}>−{formatCOP(liquidacion.totalDeducciones)}</Text>
+          <Separador />
+          <View style={s.totalFila}>
+            <Text style={[s.totalLabel, { color: t.text }]}>Total descuentos</Text>
+            <Text style={[s.totalVal, { color: Colors.negative }]}>
+              −{formatCOP(liq.totalDeducciones)}
+            </Text>
           </View>
-        </View>
-
-        {/* Neto */}
-        <View style={s.netoBox}>
-          <Text style={s.netoLabel}>NETO A PAGAR</Text>
-          <Text style={s.netoValor}>{formatCOP(liquidacion.neto)}</Text>
         </View>
 
         {/* Ajustes manuales */}
-        <View style={s.seccion}>
-          <View style={s.seccionHeaderRow}>
-            <Text style={s.seccionTitulo}>🔧 Ajustes manuales</Text>
-            <TouchableOpacity style={s.addBtn} onPress={() => setModalAjuste(true)}>
-              <Text style={s.addBtnText}>+ Agregar</Text>
+        <View style={[s.seccion, { backgroundColor: t.card }]}>
+          <View style={s.secHeader}>
+            <Text style={[s.secTitulo, { color: t.textSecondary }]}>AJUSTES MANUALES</Text>
+            <TouchableOpacity onPress={() => setModalAjuste(true)}>
+              <Text style={[s.addLink, { color: Colors.accent }]}>+ Agregar</Text>
             </TouchableOpacity>
           </View>
-          {ajustes.length === 0 && (
-            <Text style={s.sinAjustes}>Sin ajustes. Agrega horas extra o festivos puntuales.</Text>
+
+          {ajustes.length === 0 ? (
+            <Text style={[s.sinAjustes, { color: t.textTertiary }]}>
+              Sin ajustes. Agrega horas extra puntuales si es necesario.
+            </Text>
+          ) : (
+            ajustes.map((aj, i) => (
+              <React.Fragment key={aj.id}>
+                {i > 0 && <Separador />}
+                <View style={s.ajusteFila}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.ajusteDesc, { color: t.text }]}>{aj.descripcion}</Text>
+                    {aj.horasExtra > 0 && (
+                      <Text style={[s.ajusteSub, { color: t.textTertiary }]}>
+                        Extra diurna: {aj.horasExtra} h
+                      </Text>
+                    )}
+                    {aj.horasFestivos > 0 && (
+                      <Text style={[s.ajusteSub, { color: t.textTertiary }]}>
+                        Extra nocturna: {aj.horasFestivos} h
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity onPress={() => deleteAjuste(aj.id).then(cargarAjustes)}>
+                    <Text style={{ color: Colors.negative, fontSize: 18 }}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              </React.Fragment>
+            ))
           )}
-          {ajustes.map((aj) => (
-            <View key={aj.id} style={s.ajusteRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.ajusteDesc}>{aj.descripcion}</Text>
-                {aj.horasExtra > 0 && (
-                  <Text style={s.ajusteSub}>Extra diurna: {aj.horasExtra} h</Text>
-                )}
-                {aj.horasFestivos > 0 && (
-                  <Text style={s.ajusteSub}>Extra nocturna: {aj.horasFestivos} h</Text>
-                )}
-                {aj.notas ? <Text style={s.ajusteNota}>{aj.notas}</Text> : null}
-              </View>
-              <TouchableOpacity onPress={() => eliminarAjuste(aj.id)}>
-                <Text style={s.ajusteEliminar}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
         </View>
 
         {/* Exportar */}
-        <TouchableOpacity style={s.exportBtn} onPress={exportarDetalle}>
-          <Text style={s.exportBtnText}>📄 Exportar detalle en PDF</Text>
+        <TouchableOpacity
+          style={[s.btnExportar, { backgroundColor: t.card }]}
+          onPress={exportarDetalle}
+        >
+          <Text style={[s.btnExportarText, { color: Colors.accent }]}>
+            Exportar detalle en PDF
+          </Text>
         </TouchableOpacity>
 
-        <View style={s.disclaimer}>
-          <Text style={s.disclaimerText}>
-            ⚠ Proyección estimada. Los factores de recargo pueden diferir. Verifica en Ajustes.
-          </Text>
-        </View>
-
-        <View style={{ height: 30 }} />
+        {/* Nota */}
+        <Text style={[s.nota, { color: t.textTertiary }]}>
+          ⚠ Proyección estimada · Verifica factores de recargo en Ajustes
+        </Text>
       </ScrollView>
 
-      {/* Modal de ajuste */}
+      {/* Modal ajuste */}
       <Modal visible={modalAjuste} animationType="slide" transparent>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={s.modalOverlay}
         >
-          <View style={s.modalBox}>
-            <Text style={s.modalTitle}>Agregar ajuste manual</Text>
+          <View style={[s.modalBox, { backgroundColor: t.card }]}>
+            <Text style={[s.modalTitulo, { color: t.text }]}>Agregar ajuste manual</Text>
 
-            <Text style={s.inputLabel}>Descripción</Text>
+            <Text style={[s.inputLabel, { color: t.textSecondary }]}>Descripción</Text>
             <TextInput
-              style={s.input}
+              style={[s.input, { color: t.text, borderColor: t.separator, backgroundColor: t.secondary }]}
               value={descAjuste}
               onChangeText={setDescAjuste}
               placeholder="Ej. Horas extra semana santa"
-              placeholderTextColor="#888"
+              placeholderTextColor={t.textTertiary}
             />
-            <Text style={s.inputLabel}>Horas extra diurnas (recargo 25%)</Text>
+
+            <Text style={[s.inputLabel, { color: t.textSecondary }]}>Horas extra diurnas (recargo 25%)</Text>
             <TextInput
-              style={s.input}
+              style={[s.input, { color: t.text, borderColor: t.separator, backgroundColor: t.secondary }]}
               keyboardType="numeric"
               value={horasExtraD}
               onChangeText={setHorasExtraD}
             />
-            <Text style={s.inputLabel}>Horas extra nocturnas (recargo 40%)</Text>
+
+            <Text style={[s.inputLabel, { color: t.textSecondary }]}>Horas extra nocturnas (recargo 40%)</Text>
             <TextInput
-              style={s.input}
+              style={[s.input, { color: t.text, borderColor: t.separator, backgroundColor: t.secondary }]}
               keyboardType="numeric"
               value={horasExtraN}
               onChangeText={setHorasExtraN}
             />
-            <Text style={s.inputLabel}>Notas</Text>
-            <TextInput
-              style={s.input}
-              value={notaAjuste}
-              onChangeText={setNotaAjuste}
-              placeholder="Opcional"
-              placeholderTextColor="#888"
-            />
 
             <View style={s.modalBtns}>
               <TouchableOpacity
-                style={[s.modalBtn, { backgroundColor: dark ? '#2d2d44' : '#f0f0f0' }]}
+                style={[s.btnModal, { backgroundColor: t.secondary }]}
                 onPress={() => setModalAjuste(false)}
               >
-                <Text style={{ color: dark ? '#e0e0e0' : '#333', fontWeight: '600' }}>Cancelar</Text>
+                <Text style={[s.btnModalText, { color: t.text }]}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.modalBtn, { backgroundColor: '#1565C0' }]}
+                style={[s.btnModal, { backgroundColor: Colors.accent }]}
                 onPress={guardarAjuste}
               >
-                <Text style={{ color: '#fff', fontWeight: '600' }}>Guardar</Text>
+                <Text style={[s.btnModalText, { color: '#fff' }]}>Guardar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -338,111 +351,89 @@ export default function DetalleQuincenaScreen() {
   );
 }
 
-const styles = (dark: boolean) =>
-  StyleSheet.create({
-    container: { flex: 1, backgroundColor: dark ? '#0f0f23' : '#f0f4f8' },
-    content: { padding: 16 },
-    error: { color: 'red', padding: 20 },
-    encabezado: {
-      backgroundColor: dark ? '#1e1e3a' : '#fff',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-    },
-    titulo: { fontSize: 18, fontWeight: 'bold', color: dark ? '#e0e0e0' : '#333' },
-    rango: { fontSize: 13, color: dark ? '#aaa' : '#666', marginVertical: 4 },
-    resumenDias: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-    badgeDia: {
-      backgroundColor: '#E3F2FD',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
-    },
-    badgeDiaText: { fontSize: 12, color: '#1565C0', fontWeight: '600' },
-    seccion: {
-      backgroundColor: dark ? '#1e1e3a' : '#fff',
-      borderRadius: 12,
-      padding: 14,
-      marginBottom: 12,
-    },
-    seccionTitulo: { fontSize: 14, fontWeight: 'bold', color: dark ? '#e0e0e0' : '#333', marginBottom: 10 },
-    seccionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    tablaHeader: {
-      flexDirection: 'row',
-      borderBottomWidth: 1,
-      borderBottomColor: dark ? '#333' : '#eee',
-      paddingBottom: 6,
-      marginBottom: 6,
-    },
-    tablaHeaderTxt: { flex: 1, fontSize: 11, color: dark ? '#888' : '#999', fontWeight: '600', textAlign: 'right' },
-    conceptoRow: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: dark ? '#2d2d44' : '#f5f5f5' },
-    conceptoNombre: { flex: 2, fontSize: 12, color: dark ? '#d0d0d0' : '#444' },
-    conceptoHoras: { flex: 1, fontSize: 12, color: dark ? '#aaa' : '#666', textAlign: 'right' },
-    conceptoTotal: { flex: 1, fontSize: 12, color: dark ? '#e0e0e0' : '#333', textAlign: 'right', fontWeight: '500' },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10, marginTop: 4 },
-    totalLabel: { fontSize: 13, fontWeight: 'bold', color: dark ? '#e0e0e0' : '#333' },
-    totalBruto: { fontSize: 15, fontWeight: 'bold', color: '#1565C0' },
-    totalDesc: { fontSize: 15, fontWeight: 'bold', color: '#e53935' },
-    deduccionRow: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: dark ? '#2d2d44' : '#f5f5f5' },
-    deduccionNombre: { flex: 2, fontSize: 12, color: dark ? '#d0d0d0' : '#444' },
-    deduccionPct: { flex: 1, fontSize: 12, color: dark ? '#aaa' : '#666', textAlign: 'right' },
-    deduccionVal: { flex: 1, fontSize: 12, color: '#e53935', textAlign: 'right', fontWeight: '500' },
-    netoBox: {
-      backgroundColor: dark ? '#1a3d28' : '#e8f5e9',
-      borderRadius: 12,
-      padding: 20,
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    netoLabel: { fontSize: 13, color: dark ? '#aaa' : '#555', marginBottom: 4 },
-    netoValor: { fontSize: 28, fontWeight: 'bold', color: '#2E7D32' },
-    addBtn: { backgroundColor: '#1565C0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
-    addBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-    sinAjustes: { fontSize: 12, color: dark ? '#666' : '#999', fontStyle: 'italic' },
-    ajusteRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: dark ? '#2d2d44' : '#f5f5f5',
-    },
-    ajusteDesc: { fontSize: 13, color: dark ? '#d0d0d0' : '#333', fontWeight: '500' },
-    ajusteSub: { fontSize: 12, color: dark ? '#aaa' : '#666', marginTop: 2 },
-    ajusteNota: { fontSize: 11, color: dark ? '#666' : '#999', fontStyle: 'italic' },
-    ajusteEliminar: { color: '#e53935', fontSize: 18, paddingLeft: 8 },
-    exportBtn: {
-      backgroundColor: dark ? '#1e3a5f' : '#e3f2fd',
-      borderRadius: 10,
-      padding: 14,
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    exportBtnText: { color: '#1565C0', fontWeight: '600', fontSize: 14 },
-    disclaimer: {
-      padding: 12,
-      backgroundColor: dark ? '#2d1f0a' : '#fff3e0',
-      borderRadius: 8,
-    },
-    disclaimerText: { fontSize: 11, color: dark ? '#ffcc80' : '#e65100', textAlign: 'center' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-    modalBox: {
-      backgroundColor: dark ? '#1e1e3a' : '#fff',
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: 24,
-    },
-    modalTitle: { fontSize: 18, fontWeight: 'bold', color: dark ? '#e0e0e0' : '#333', marginBottom: 16 },
-    inputLabel: { fontSize: 13, color: dark ? '#ccc' : '#555', marginBottom: 4 },
-    input: {
-      borderWidth: 1,
-      borderColor: dark ? '#444' : '#ddd',
-      borderRadius: 8,
-      padding: 10,
-      color: dark ? '#e0e0e0' : '#333',
-      backgroundColor: dark ? '#0f0f23' : '#f9f9f9',
-      marginBottom: 12,
-      fontSize: 15,
-    },
-    modalBtns: { flexDirection: 'row', gap: 12, marginTop: 8 },
-    modalBtn: { flex: 1, padding: 14, borderRadius: 10, alignItems: 'center' },
-  });
+const s = StyleSheet.create({
+  container: { flex: 1 },
+  encabezado: {
+    padding: Spacing.md,
+    margin: Spacing.md,
+    borderRadius: Radius.lg,
+  },
+  encTitulo: { ...Typography.caption2, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  encMes: { ...Typography.title2, marginBottom: 2 },
+  encRango: { ...Typography.footnote, marginBottom: 12 },
+  diasBox: {
+    flexDirection: 'row',
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+    gap: 16,
+  },
+  diaItem: { alignItems: 'center' },
+  diaNum: { ...Typography.title3, fontWeight: '700' },
+  diaLbl: { ...Typography.caption2 },
+
+  netoCard: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  netoLabel: { ...Typography.footnote, marginBottom: 4 },
+  netoValor: { ...Typography.largeTitle, color: Colors.positive },
+
+  seccion: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+  },
+  secHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  secTitulo: { ...Typography.caption2, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 10 },
+  addLink: { ...Typography.footnote },
+
+  sep: { height: 0.5, marginVertical: 1 },
+
+  fila: { flexDirection: 'row', paddingVertical: 8, alignItems: 'flex-start' },
+  filaNombre: { ...Typography.footnote, flex: 2, paddingRight: 8 },
+  filaHoras: { ...Typography.caption, flex: 1, textAlign: 'right' },
+  filaTotal: { ...Typography.footnote, fontWeight: '500', flex: 1, textAlign: 'right' },
+
+  totalFila: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+  },
+  totalLabel: { ...Typography.headline },
+  totalVal: { ...Typography.headline },
+
+  sinAjustes: { ...Typography.footnote, fontStyle: 'italic', paddingVertical: 8 },
+  ajusteFila: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 8 },
+  ajusteDesc: { ...Typography.subhead, fontWeight: '500' },
+  ajusteSub: { ...Typography.caption },
+
+  btnExportar: {
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.lg,
+    padding: 16,
+    alignItems: 'center',
+  },
+  btnExportarText: { ...Typography.headline },
+
+  nota: { ...Typography.caption2, textAlign: 'center', padding: Spacing.md },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalBox: { borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg },
+  modalTitulo: { ...Typography.title3, marginBottom: Spacing.md },
+  inputLabel: { ...Typography.footnote, marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    padding: 12,
+    marginBottom: Spacing.sm,
+    ...Typography.body,
+  },
+  modalBtns: { flexDirection: 'row', gap: 12, marginTop: Spacing.sm },
+  btnModal: { flex: 1, padding: 14, borderRadius: Radius.md, alignItems: 'center' },
+  btnModalText: { ...Typography.headline },
+});

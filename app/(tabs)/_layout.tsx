@@ -1,68 +1,54 @@
 import { Tabs } from 'expo-router';
-import { useColorScheme, Platform } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../../src/theme';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
-function TabIcon({ name, focused }: { name: IconName; focused: boolean }) {
-  return <Ionicons name={name} size={24} color={focused ? '#1565C0' : '#888'} />;
-}
-
 export default function TabsLayout() {
   const scheme = useColorScheme();
-  const bg = scheme === 'dark' ? '#1a1a2e' : '#fff';
-  const border = scheme === 'dark' ? '#2d2d44' : '#e0e0e0';
+  const dark = scheme === 'dark';
 
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: scheme === 'dark' ? '#1a1a2e' : '#1565C0' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: bg,
-          borderTopColor: border,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          height: Platform.OS === 'ios' ? 80 : 60,
+          backgroundColor: dark ? '#1C1C1E' : '#FFFFFF',
+          borderTopColor: dark ? '#38383A' : '#E5E5EA',
+          borderTopWidth: 0.5,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          paddingTop: 8,
+          height: Platform.OS === 'ios' ? 82 : 60,
         },
-        tabBarActiveTintColor: '#1565C0',
-        tabBarInactiveTintColor: '#888',
-        tabBarLabelStyle: { fontSize: 11 },
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: dark ? '#636366' : '#AEAEB2',
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '500', marginTop: 2 },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Proyección',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'cash' : 'cash-outline'} focused={focused} />
+          title: 'Inicio',
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'wallet' : 'wallet-outline'}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="calendar"
         options={{
-          title: 'Calendario',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'calendar' : 'calendar-outline'} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="charts"
-        options={{
-          title: 'Gráficos',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'bar-chart' : 'bar-chart-outline'} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: 'Histórico',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'archive' : 'archive-outline'} focused={focused} />
+          title: 'Turnos',
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'calendar' : 'calendar-outline'}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -70,8 +56,38 @@ export default function TabsLayout() {
         name="primas"
         options={{
           title: 'Primas',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'gift' : 'gift-outline'} focused={focused} />
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'gift' : 'gift-outline'}
+              size={22}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="charts"
+        options={{
+          title: 'Gráficos',
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'bar-chart' : 'bar-chart-outline'}
+              size={22}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'Histórico',
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'time' : 'time-outline'}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />
@@ -79,8 +95,12 @@ export default function TabsLayout() {
         name="settings"
         options={{
           title: 'Ajustes',
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={focused ? 'settings' : 'settings-outline'} focused={focused} />
+          tabBarIcon: ({ focused, color }) => (
+            <Ionicons
+              name={focused ? 'person-circle' : 'person-circle-outline'}
+              size={22}
+              color={color}
+            />
           ),
         }}
       />

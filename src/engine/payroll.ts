@@ -268,6 +268,7 @@ export function calcularQuincena(
 
   return {
     quincenaId: quincena.id,
+    tipo: quincena.tipo,
     fechaInicio: quincena.fechaInicio,
     fechaFin: quincena.fechaFin,
     etiqueta: quincena.etiqueta,
