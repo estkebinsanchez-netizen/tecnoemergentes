@@ -71,9 +71,9 @@ export const CONFIG_DEFAULT: ConfiguracionUsuario = {
   factorDominicalFestivo: 25305.50,
   pctSalud: 4,
   pctPension: 4,
-  pctRetencion: 10.94,             // Tarifa 2 — colilla dic-2025
-  pctFondoSol: 1,
-  pctSindical: 0,                  // ACOGIDO-NINGUNO: no afiliado a SINTRAMINED
+  pctRetencion: 11.43,             // Tasa año fiscal 2026
+  pctFondoSol: 1,                  // Aplica cuando ingreso > 4 SMLMV mensual
+  pctSindical: 1,                  // Cuota sindical convención Drummond
   baseDeduccion: 'BRUTO',
   valorBaseFijo: 5567249,
   fechaAnclaje: '2026-05-22',
