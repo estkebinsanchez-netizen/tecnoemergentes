@@ -64,16 +64,16 @@ export interface ConfiguracionUsuario {
 export const CONFIG_DEFAULT: ConfiguracionUsuario = {
   nombre: '',
   valorHoraOrdinaria: 23196.87,
-  salarioBasicoDiario: 278362.44,  // 23196.87 × 12 h
+  salarioBasicoDiario: 321183,      // RDIARIO convención Drummond 2026 (escala de $305.588 dic-2025)
   factorRecNocturno: 8856.58,
   factorExtraDiurna25: 8434.41,
   factorExtraNocturna40: 12231.72,
   factorDominicalFestivo: 25305.50,
   pctSalud: 4,
   pctPension: 4,
-  pctRetencion: 11.43,
+  pctRetencion: 10.94,             // Tarifa 2 — colilla dic-2025
   pctFondoSol: 1,
-  pctSindical: 1.20,
+  pctSindical: 0,                  // ACOGIDO-NINGUNO: no afiliado a SINTRAMINED
   baseDeduccion: 'BRUTO',
   valorBaseFijo: 5567249,
   fechaAnclaje: '2026-05-22',

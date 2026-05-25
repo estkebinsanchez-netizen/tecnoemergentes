@@ -247,15 +247,18 @@ export function calcularQuincena(
     valor: Math.round((base * config.pctRetencion) / 100),
   });
 
-  // Solo 2ª quincena (tipo B = 10-24)
-  if (!esPrimeraQuincena) {
+  // Fondo de Solidaridad — ambas quincenas (ingresos > 4 SMLMV)
+  if (config.pctFondoSol > 0) {
     deducciones.push({
       nombre: 'Fondo de Solidaridad (1%)',
       base,
       porcentaje: config.pctFondoSol,
       valor: Math.round((base * config.pctFondoSol) / 100),
     });
+  }
 
+  // Cuota sindical — solo 2ª quincena, solo si está afiliado
+  if (!esPrimeraQuincena && config.pctSindical > 0) {
     deducciones.push({
       nombre: `Cuota Sindical SINTRAMINED (${config.pctSindical}%)`,
       base,

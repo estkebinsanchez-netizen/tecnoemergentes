@@ -165,9 +165,9 @@ export default function SettingsScreen() {
           <Sep t={t} />
           {nc('Aporte a Pensión', 'pctPension')}
           <Sep t={t} />
-          {nc('Fondo de Solidaridad — solo 2ª quincena', 'pctFondoSol')}
+          {nc('Fondo de Solidaridad — ambas quincenas', 'pctFondoSol')}
           <Sep t={t} />
-          {nc('Cuota Sindical SINTRAMINED — solo 2ª quincena', 'pctSindical')}
+          {nc('Cuota Sindical SINTRAMINED — solo 2ª quincena (0 si no afiliado)', 'pctSindical')}
         </View>
 
         {/* Base de deducciones */}
